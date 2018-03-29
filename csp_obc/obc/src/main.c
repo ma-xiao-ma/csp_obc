@@ -32,11 +32,20 @@
 
 
 #include <csp/interfaces/csp_if_i2c.h>
+#include <csp/interfaces/csp_if_can.h>
 #include <csp/interfaces/csp_if_kiss.h>
 
 /** Example defines */
-#define MY_ADDRESS  1           // Address of local CSP node
+#define MY_ADDRESS  2           // Address of local CSP node
 #define MY_PORT     10          // Port to send test traffic to
+
+#if( MY_ADDRESS == 2 )
+#define ANOTHER_OBC_ADDR  1
+#define CONFIG_HOSTNAME   "OBC-2"
+#else
+#define ANOTHER_OBC_ADDR  2
+#define CONFIG_HOSTNAME   "OBC-1"
+#endif
 
 /***************开始任务********************/
 //任务优先级
@@ -242,18 +251,23 @@ CSP_DEFINE_TASK(task_server) {
             continue;
 
         /* Read packets. Timout is 100 ms */
-        while ((packet = csp_read(conn, 100)) != NULL) {
-            switch (csp_conn_dport(conn)) {
-            case MY_PORT:
-                /* Process packet here */
-                printf("Packet received on MY_PORT: %s\r\n", (char *) packet->data);
-                csp_buffer_free(packet);
-                break;
+        while ((packet = csp_read(conn, 100)) != NULL)
+        {
+            switch (csp_conn_dport(conn))
+            {
+                case MY_PORT:
+                    /* Process packet here */
 
-            default:
-                /* Let the service handler reply pings, buffer use, etc. */
-                csp_service_handler(conn, packet);
-                break;
+//                    printf("Packet received on MY_PORT: %s\r\n", (char *) packet->data);
+
+                    log_info( "Server: Packet received on MY_PORT: %s\r\n", (char *) packet->data );
+                    csp_buffer_free(packet);
+                    break;
+
+                default:
+                    /* Let the service handler reply pings, buffer use, etc. */
+                    csp_service_handler(conn, packet);
+                    break;
             }
         }
 
@@ -275,8 +289,10 @@ CSP_DEFINE_TASK(task_client) {
 
         csp_sleep_ms(1000);
 
-        int result = csp_ping(MY_ADDRESS, 100, 100, CSP_O_NONE);
-        printf("Ping result %d [ms]\r\n", result);
+        int result = csp_ping(ANOTHER_OBC_ADDR, 100, 100, CSP_O_NONE);
+
+        log_info( "Client: Ping result %d [ms]\r\n", result );
+//        printf("Ping result %d [ms]\r\n", result);
 
         csp_sleep_ms(1000);
 
@@ -292,7 +308,7 @@ CSP_DEFINE_TASK(task_client) {
         }
 
         /* Connect to host HOST, port PORT with regular UDP-like protocol and 1000 ms timeout */
-        conn = csp_connect(CSP_PRIO_NORM, MY_ADDRESS, MY_PORT, 1000, CSP_O_NONE);
+        conn = csp_connect(CSP_PRIO_NORM, ANOTHER_OBC_ADDR, MY_PORT, 1000, CSP_O_NONE);
         if (conn == NULL) {
             /* Connect failed */
             printf("Connection failed\n");
@@ -338,45 +354,46 @@ void my_usart3_rx(uint8_t * buf, int len, void * pxTaskWoken) {
 
 void init_csp(void)
 {
-
     /* Initialise CSP */
     log_csp_init();
+
     csp_buffer_init(10, 300);
-    csp_init(1);
+
+    csp_init(MY_ADDRESS);
 
     csp_set_hostname(CONFIG_HOSTNAME);
     csp_set_model(CONFIG_MODEL);
     csp_set_revision(GIT_REVISION);
 
-    csp_kiss_init(&csp_if_kiss1, &csp_kiss1_driver, usart3_putc, usart3_insert, kiss1_name);
-    usart_set_callback(&my_usart3_rx);
-
-    csp_route_set(8, &csp_if_kiss1, CSP_NODE_MAC);
-
-//    extern csp_iface_t csp_if_i2c;
     /* I2C */
-    csp_i2c_init(1, 0, 400);
+    csp_i2c_init(MY_ADDRESS, 0, 400);
+#if( MY_ADDRESS == 2 )
+    csp_route_set(1, &csp_if_i2c, CSP_NODE_MAC);
+#else
     csp_route_set(2, &csp_if_i2c, CSP_NODE_MAC);
+#endif
     csp_route_set(3, &csp_if_i2c, CSP_NODE_MAC);
     csp_route_set(4, &csp_if_i2c, CSP_NODE_MAC);
-    csp_route_set(5, &csp_if_i2c, CSP_NODE_MAC);
-    csp_route_set(6, &csp_if_i2c, CSP_NODE_MAC);
-    csp_route_set(7, &csp_if_i2c, CSP_NODE_MAC);
+
+    /* CAN */
+    struct csp_can_config conf = {0};
+    csp_can_init(CSP_CAN_MASKED, &conf);
+    csp_route_set(5, &csp_if_can, CSP_NODE_MAC);
+    csp_route_set(6, &csp_if_can, CSP_NODE_MAC);
+
+    /* UART KISS */
+    usart_set_callback(&my_usart3_rx);
+    csp_kiss_init(&csp_if_kiss1, &csp_kiss1_driver, usart3_putc, usart3_insert, kiss1_name);
+    csp_route_set(7, &csp_if_kiss1, CSP_NODE_MAC);
+    csp_route_set(8, &csp_if_kiss1, CSP_NODE_MAC);
+
 
     /* Default route */
-    csp_route_set(CSP_DEFAULT_ROUTE, &csp_if_i2c, 5);
+    csp_route_set(CSP_DEFAULT_ROUTE, &csp_if_i2c, 4);
 
     /* Start router */
     csp_route_start_task(1024, 3);
 
-//    printf("Initialising CSP\r\n");
-//    csp_buffer_init(5, 300);
-//
-//    /* Init CSP with address MY_ADDRESS */
-//    csp_init(MY_ADDRESS);
-//
-//    /* Start router task with 500 word stack, OS task priority 1 */
-//    csp_route_start_task(500, 1);
 
     printf("Conn table\r\n");
     csp_conn_print_table();
@@ -413,7 +430,7 @@ void vTaskInit(void *pvParameters)
     /** Start Console */
     command_init();
     console_init();
-    console_set_hostname("obc");
+    console_set_hostname(CONFIG_HOSTNAME);
 
     ret = xTaskCreate(debug_console, (const signed char *) "CONSOLE", 1024, NULL, 2, NULL);
     if (ret != pdTRUE) {

@@ -31,7 +31,7 @@ int cmd_log_mask(struct command_context * ctx, int type)
 		if (mask_new < 0)
 			return CMD_ERROR_SYNTAX;
 
-		printf("Set mask of group %s from 0x%02"PRIX8" to 0x%02"PRIX8"\r\n",
+		printf("Set mask of group %s from 0x%02X to 0x%02X\r\n",
 		       token, (uint8_t)mask_old, (uint8_t)mask_new);
 
 		log_set_mask(token, (uint8_t)mask_new, type);

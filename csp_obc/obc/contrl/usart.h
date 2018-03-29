@@ -106,10 +106,10 @@
 //}
 
 #define TTY_BAUDRATE          921600                    /*波特率 ------------*/
-#define TTY_TXBUF_SIZE        2048                       /*发送缓冲区长度 -----*/
-#define TTY_RXBUF_SIZE        2048                       /*接收缓冲区长度 -----*/
-#define TTY_DMA_TX_LEN        100                        /*DMA 发送缓冲区 ----*/
-#define TTY_DMA_RX_LEN        100                        /*DMA 接收缓冲区 ----*/
+#define TTY_TXBUF_SIZE        4096                       /*发送缓冲区长度 -----*/
+#define TTY_RXBUF_SIZE        4096                       /*接收缓冲区长度 -----*/
+#define TTY_DMA_TX_LEN        256                        /*DMA 发送缓冲区 ----*/
+#define TTY_DMA_RX_LEN        256                        /*DMA 接收缓冲区 ----*/
 
 #define TTY_USE_DMA           1                         /*启用DMA -----------*/
 

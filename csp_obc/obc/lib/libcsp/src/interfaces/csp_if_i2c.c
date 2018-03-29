@@ -98,6 +98,9 @@ void csp_i2c_rx(i2c_frame_t * frame, void * pxTaskWoken) {
 
 int csp_i2c_init(uint8_t addr, int handle, int speed) {
 
+    /* i2c io init */
+    PCA9665_IO_Init();
+
 	/* Create i2c_handle */
 	csp_i2c_handle = handle;
 	if (i2c_init(csp_i2c_handle, I2C_MASTER, addr, speed, 10, 10, csp_i2c_rx) != E_NO_ERR)
