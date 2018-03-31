@@ -649,11 +649,11 @@ static void DMA_Conf(void)
 
     /* Enable the DMA Stream IRQ Channel */
     NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream1_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 6;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 6;
     NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream3_IRQn;
     NVIC_Init(&NVIC_InitStructure);
 }
@@ -680,7 +680,7 @@ static void uart_conf(void)
     USART_Init(USART3, &USART_InitStructure);
 
     NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
@@ -810,15 +810,16 @@ void DMA1_Stream1_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
 #if TTY_USE_DMA == 1
-    portBASE_TYPE xTaskWoken = pdFALSE;
+    static portBASE_TYPE xTaskWoken;
     uint16_t len, retry = 0;
+
     if (USART_GetITStatus(USART3, USART_IT_IDLE) != RESET ||
         USART_GetITStatus(USART3, USART_IT_FE) != RESET)
     {
         /*获取DMA缓冲区内的有效数据长度 --------------------------------------*/
         len = sizeof(dma_rx_buf) - DMA_GetCurrDataCounter(DMA1_Stream1);
         DMA_Cmd(DMA1_Stream1, DISABLE);
-        ring_buf_put(&ringbuf_recv,dma_rx_buf, len);    /*将数据放入接收缓冲区*/
+        ring_buf_put(&ringbuf_recv, dma_rx_buf, len);    /*将数据放入接收缓冲区*/
         while (DMA_GetCmdStatus(DMA1_Stream1) != DISABLE && retry++ < 100){}
         DMA_ClearFlag(DMA1_Stream1, DMA_FLAG_TCIF1);    /*清除DMA传输完成标志,否则会进入传输完成中断*/
         /*复位DMA当前计数器值 ------------------------------------------------*/
@@ -826,8 +827,9 @@ void USART3_IRQHandler(void)
         DMA_Cmd(DMA1_Stream1, ENABLE);
         len = USART3->SR;                               /*清除空闲中断标志 -------*/
         len = USART3->DR;
-//        xSemaphoreGiveFromISR(usart_pdc_irq, &xTaskWoken);
-//        portYIELD_FROM_ISR(xTaskWoken);
+        xTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(usart_pdc_irq, &xTaskWoken);
+        portYIELD_FROM_ISR(xTaskWoken);
     }
     if (USART_GetITStatus(USART3, USART_IT_TC) != RESET)
     {
@@ -942,27 +944,28 @@ void vTaskUsartRx(void * pvParameters) {
 
     while(1) {
 
-//        /* 若中断同步信号给出 */
-//        xSemaphoreTake(usart_pdc_irq, portMAX_DELAY);
+        /* 若中断同步信号给出 */
+        if( xSemaphoreTake(usart_pdc_irq, 1000) != pdTRUE )
+            continue;
 
-        if (!(len = tty.buflen()))
+        if( !(len = tty.buflen()) )
         {
             vTaskDelay(10);
             continue;
         }
 
         uint8_t *buf = (uint8_t *)ObcMemMalloc(len);
-        if (buf == NULL)
+        if( buf == NULL )
             continue;
 
         tty.read(buf, len);
 
         /* 中断延时处理 */
-        if (usart_rx_callback != NULL) {
+        if( usart_rx_callback != NULL ) {
 
             usart_rx_callback(buf, len, NULL);
         }
-        else if (usart_rxqueue != NULL) {
+        else if( usart_rxqueue != NULL ) {
 
             for (int i = 0; i < len; i++)
                 xQueueSendToBack(usart_rxqueue, buf + i, 0);

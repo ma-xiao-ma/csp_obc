@@ -17,10 +17,11 @@
 #include "semphr.h"
 
 #include "bsp_pca9665.h"
+#include "bsp_delay.h"
 #include "error.h"
 #include "driver_debug.h"
 #include "command.h"
-#include "obc_mem.h"
+#include <csp/csp_buffer.h>
 #include "ctrl_cmd_types.h"
 #include "route.h"
 

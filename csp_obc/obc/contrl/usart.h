@@ -105,7 +105,7 @@
 //    return usart_messages_waiting(usart_stdio_id);
 //}
 
-#define TTY_BAUDRATE          921600                    /*波特率 ------------*/
+#define TTY_BAUDRATE          115200                   /*波特率 ------------*/
 #define TTY_TXBUF_SIZE        4096                       /*发送缓冲区长度 -----*/
 #define TTY_RXBUF_SIZE        4096                       /*接收缓冲区长度 -----*/
 #define TTY_DMA_TX_LEN        256                        /*DMA 发送缓冲区 ----*/

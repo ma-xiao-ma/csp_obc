@@ -423,7 +423,6 @@ int csp_transaction(uint8_t prio, uint8_t dest, uint8_t port, uint32_t timeout, 
 	csp_close(conn);
 
 	return status;
-
 }
 
 csp_packet_t * csp_recvfrom(csp_socket_t * socket, uint32_t timeout) {

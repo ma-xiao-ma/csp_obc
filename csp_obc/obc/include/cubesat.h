@@ -14,7 +14,4 @@
 #define CONSOLE_HISTORY_ELEMENTS    10 //调试台历史指令
 #define CONFIG_DRIVER_DEBUG         1  //调试信息输出使能
 
-#define CONFIG_MODEL        "NJUST"
-#define GIT_REVISION        "b0a6153"
-
 #endif
